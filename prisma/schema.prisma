@@ -1,0 +1,42 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  settings  Settings?
+  files     File[]
+}
+
+model Settings {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  theme       String   @default("dark")
+  wallpaper   String   @default("/wallpapers/default.jpg")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model File {
+  id        String   @id @default(uuid())
+  name      String
+  type      String   // "file" or "folder"
+  path      String
+  content   String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  parentId  String?
+  parent    File?    @relation("FileHierarchy", fields: [parentId], references: [id])
+  children  File[]   @relation("FileHierarchy")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
