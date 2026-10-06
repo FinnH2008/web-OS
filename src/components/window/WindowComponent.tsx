@@ -19,6 +19,7 @@ export default function WindowComponent({ windowData, children }: WindowComponen
       focusWindow,
       updateWindowPosition,
       updateWindowSize,
+      snapWindow,
       activeWindowId
   } = useWindowStore();
 
@@ -27,24 +28,55 @@ export default function WindowComponent({ windowData, children }: WindowComponen
   const isActive = activeWindowId === windowData.id;
 
   const handleMaximizeToggle = () => {
-      if (windowData.isMaximized) {
+      if (windowData.isMaximized || windowData.snapPosition !== 'none') {
           restoreWindow(windowData.id);
       } else {
           maximizeWindow(windowData.id);
       }
   };
 
+  // Determine size and position based on state
+  let currentSize = windowData.size;
+  let currentPosition = windowData.position;
+
+  if (windowData.isMaximized || windowData.snapPosition === 'top') {
+      currentSize = { width: '100%', height: '100%' };
+      currentPosition = { x: 0, y: 0 };
+  } else if (windowData.snapPosition === 'left') {
+      currentSize = { width: '50%', height: '100%' };
+      currentPosition = { x: 0, y: 0 };
+  } else if (windowData.snapPosition === 'right') {
+      currentSize = { width: '50%', height: '100%' };
+      // Can't reliably use window.innerWidth in render without state, but Rnd handles % well.
+      // We will let Rnd control the width and just set x dynamically based on window innerWidth.
+      currentPosition = { x: typeof window !== 'undefined' ? window.innerWidth / 2 : 0, y: 0 };
+  }
+
+  const isSnapped = windowData.isMaximized || windowData.snapPosition !== 'none';
+
   return (
     <Rnd
-      size={windowData.isMaximized ? { width: '100%', height: 'calc(100% - 80px)' } : { width: windowData.size.width, height: windowData.size.height }}
-      position={windowData.isMaximized ? { x: 0, y: 0 } : { x: windowData.position.x, y: windowData.position.y }}
+      size={currentSize}
+      position={currentPosition}
       onDragStop={(e, d) => {
         if (!windowData.isMaximized) {
-            updateWindowPosition(windowData.id, { x: d.x, y: d.y });
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+
+            // Advanced Snapping Detection
+            if (d.y <= 0) {
+                snapWindow(windowData.id, 'top');
+            } else if (d.x <= 0) {
+                snapWindow(windowData.id, 'left');
+            } else if (d.x + 100 >= screenWidth) { // Using +100 as a threshold for the right edge
+                snapWindow(windowData.id, 'right');
+            } else {
+                updateWindowPosition(windowData.id, { x: d.x, y: d.y });
+            }
         }
       }}
       onResizeStop={(e, direction, ref, delta, position) => {
-        if (!windowData.isMaximized) {
+        if (!isSnapped) {
             updateWindowSize(windowData.id, {
                 width: parseInt(ref.style.width),
                 height: parseInt(ref.style.height),
@@ -52,12 +84,18 @@ export default function WindowComponent({ windowData, children }: WindowComponen
             updateWindowPosition(windowData.id, position);
         }
       }}
+      onDragStart={() => {
+          // If dragging a snapped window, un-snap it and restore to previous size at mouse position
+          if (isSnapped) {
+              restoreWindow(windowData.id);
+          }
+      }}
       minWidth={300}
       minHeight={200}
       bounds="parent"
       dragHandleClassName="window-drag-handle"
       disableDragging={windowData.isMaximized}
-      enableResizing={!windowData.isMaximized}
+      enableResizing={!isSnapped}
       style={{ zIndex: windowData.zIndex }}
       className="pointer-events-auto absolute"
       onMouseDown={() => focusWindow(windowData.id)}
@@ -66,44 +104,51 @@ export default function WindowComponent({ windowData, children }: WindowComponen
         initial={{ opacity: 0, scale: 0.95, y: 10 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{ duration: 0.2 }}
-        className={`w-full h-full flex flex-col rounded-xl overflow-hidden backdrop-blur-3xl transition-shadow ${
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className={`w-full h-full flex flex-col overflow-hidden backdrop-blur-3xl transition-all duration-200 ${
+            isSnapped ? 'rounded-none' : 'rounded-2xl'
+        } ${
             isActive
-                ? 'shadow-2xl border border-white/30 bg-black/40'
-                : 'shadow-lg border border-white/10 bg-black/20'
+                ? 'shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/20 bg-black/40'
+                : 'shadow-[0_10px_30px_rgba(0,0,0,0.3)] border border-white/10 bg-black/20'
         }`}
       >
-        {/* Title Bar */}
+        {/* Title Bar - Advanced Glassmorphism */}
         <div
-            className="window-drag-handle h-10 flex items-center justify-between px-4 bg-white/5 border-b border-white/10 select-none"
+            className="window-drag-handle h-12 flex items-center justify-between px-4 bg-gradient-to-b from-white/10 to-transparent border-b border-white/10 select-none relative"
             onDoubleClick={handleMaximizeToggle}
         >
-            <div className="flex items-center gap-2">
-                <span className="text-white/90 font-medium text-sm drop-shadow-md">
-                    {windowData.title}
-                </span>
-            </div>
+            {/* Top edge highlight */}
+            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
 
+            {/* Traffic Lights */}
             <div className="flex items-center gap-2">
                 <button
-                    onClick={(e) => { e.stopPropagation(); minimizeWindow(windowData.id); }}
-                    className="w-3 h-3 rounded-full bg-yellow-500/80 hover:bg-yellow-400 flex items-center justify-center group"
+                    onClick={(e) => { e.stopPropagation(); closeWindow(windowData.id); }}
+                    className="w-3.5 h-3.5 rounded-full bg-[#ff5f56] hover:bg-[#ff5f56]/80 flex items-center justify-center group shadow-inner border border-black/10"
                 >
-                    <Minus className="w-2 h-2 opacity-0 group-hover:opacity-100 text-black" />
+                    <X className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 text-black/60" strokeWidth={3} />
+                </button>
+                <button
+                    onClick={(e) => { e.stopPropagation(); minimizeWindow(windowData.id); }}
+                    className="w-3.5 h-3.5 rounded-full bg-[#ffbd2e] hover:bg-[#ffbd2e]/80 flex items-center justify-center group shadow-inner border border-black/10"
+                >
+                    <Minus className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 text-black/60" strokeWidth={3} />
                 </button>
                 <button
                     onClick={(e) => { e.stopPropagation(); handleMaximizeToggle(); }}
-                    className="w-3 h-3 rounded-full bg-green-500/80 hover:bg-green-400 flex items-center justify-center group"
+                    className="w-3.5 h-3.5 rounded-full bg-[#27c93f] hover:bg-[#27c93f]/80 flex items-center justify-center group shadow-inner border border-black/10"
                 >
-                    <Square className="w-2 h-2 opacity-0 group-hover:opacity-100 text-black" />
-                </button>
-                <button
-                    onClick={(e) => { e.stopPropagation(); closeWindow(windowData.id); }}
-                    className="w-3 h-3 rounded-full bg-red-500/80 hover:bg-red-400 flex items-center justify-center group"
-                >
-                    <X className="w-2 h-2 opacity-0 group-hover:opacity-100 text-black" />
+                    <Square className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 text-black/60" strokeWidth={3} />
                 </button>
             </div>
+
+            {/* Title */}
+            <div className="absolute left-1/2 -translate-x-1/2 font-medium text-sm text-white/90 drop-shadow-md">
+                {windowData.title}
+            </div>
+
+            <div className="w-16"></div> {/* Spacer to center title properly */}
         </div>
 
         {/* Content Area */}

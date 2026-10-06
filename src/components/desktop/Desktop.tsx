@@ -1,7 +1,8 @@
 'use client';
 
 import { useSystemStore } from '@/store/systemStore';
-import { useWindowStore } from '@/store/windowStore';
+import { useWindowStore, type WindowData } from '@/store/windowStore';
+import { useAppStore } from '@/store/appStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Folder,
@@ -9,7 +10,13 @@ import {
   FileText,
   Settings,
   Calculator,
-  Power
+  RefreshCw,
+  Plus,
+  Info,
+  Activity,
+  Globe,
+  Music,
+  ShoppingBag
 } from 'lucide-react';
 import WindowComponent from '../window/WindowComponent';
 import FileManager from '@/apps/FileManager';
@@ -17,107 +24,135 @@ import TerminalApp from '@/apps/TerminalApp';
 import TextEditor from '@/apps/TextEditor';
 import SettingsApp from '@/apps/SettingsApp';
 import CalculatorApp from '@/apps/CalculatorApp';
+import SystemMonitorApp from '@/apps/SystemMonitorApp';
+import BrowserApp from '@/apps/BrowserApp';
+import MediaPlayerApp from '@/apps/MediaPlayerApp';
+import AppStoreApp from '@/apps/AppStoreApp';
+import NotificationToast from '../ui/NotificationToast';
+import DesktopIcon from './DesktopIcon';
+import Taskbar from './taskbar/Taskbar';
+import StartMenu from './startmenu/StartMenu';
+import { useContextMenu } from '@/hooks/useContextMenu';
+import ContextMenu from '../ui/ContextMenu';
+import { useEffect, useMemo, useState } from 'react';
 
-const apps = [
+const ALL_APPS = [
   { id: 'file-manager', title: 'Files', icon: Folder, color: 'text-blue-400' },
+  { id: 'browser', title: 'Browser', icon: Globe, color: 'text-blue-300' },
   { id: 'terminal', title: 'Terminal', icon: Terminal, color: 'text-green-400' },
   { id: 'editor', title: 'Notes', icon: FileText, color: 'text-yellow-400' },
   { id: 'calculator', title: 'Calculator', icon: Calculator, color: 'text-orange-400' },
+  { id: 'monitor', title: 'Activity', icon: Activity, color: 'text-red-400' },
+  { id: 'media-player', title: 'Media', icon: Music, color: 'text-purple-400' },
+  { id: 'app-store', title: 'Store', icon: ShoppingBag, color: 'text-pink-400' },
   { id: 'settings', title: 'Settings', icon: Settings, color: 'text-gray-300' },
 ] as const;
 
 export default function Desktop() {
     const settings = useSystemStore(state => state.settings);
-    const setPhase = useSystemStore(state => state.setPhase);
-    const { windows, openWindow, activeWindowId } = useWindowStore();
+    const { windows, openWindow, activeWindowId, focusWindow, closeWindow } = useWindowStore();
+    const { installedApps } = useAppStore();
 
-    const handleAppClick = (appId: typeof apps[number]['id'], title: string) => {
-        openWindow({ type: appId, title });
+    const { clicked, setClicked, points, handleContextMenu } = useContextMenu();
+    const [startMenuOpen, setStartMenuOpen] = useState(false);
+
+    const activeApps = useMemo(() => {
+        return ALL_APPS.filter(app => installedApps.includes(app.id));
+    }, [installedApps]);
+
+    const handleAppClick = (appId: string, title: string) => {
+        openWindow({ type: appId as WindowData['type'], title });
     };
+
+    // Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
+                e.preventDefault();
+                if (activeWindowId) {
+                    closeWindow(activeWindowId);
+                }
+            }
+            if (e.key === 'Meta') { // Windows/Command key toggles start menu
+                 setStartMenuOpen(prev => !prev);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [activeWindowId, closeWindow]);
 
     const renderAppContent = (type: string) => {
         switch (type) {
             case 'file-manager': return <FileManager />;
+            case 'browser': return <BrowserApp />;
             case 'terminal': return <TerminalApp />;
             case 'editor': return <TextEditor />;
             case 'settings': return <SettingsApp />;
             case 'calculator': return <CalculatorApp />;
+            case 'monitor': return <SystemMonitorApp />;
+            case 'media-player': return <MediaPlayerApp />;
+            case 'app-store': return <AppStoreApp />;
             default: return <div className="p-4">App not found</div>;
         }
     };
 
+    const desktopContextMenuItems = [
+        { label: 'New Folder', action: () => handleAppClick('file-manager', 'Files'), icon: <Plus size={14}/> },
+        { divider: true, action: ()=>{}, label: '' },
+        { label: 'DexStore', action: () => handleAppClick('app-store', 'Store'), icon: <ShoppingBag size={14}/> },
+        { label: 'System Monitor', action: () => handleAppClick('monitor', 'Activity'), icon: <Activity size={14}/> },
+        { label: 'Change Wallpaper', action: () => handleAppClick('settings', 'Settings'), icon: <Settings size={14}/> },
+        { label: 'Refresh', action: () => window.location.reload(), icon: <RefreshCw size={14}/> },
+        { divider: true, action: ()=>{}, label: '' },
+        { label: 'About DexTop', action: () => alert('Virtual DexTop OS v1.0\nHybrid Architecture Edition.'), icon: <Info size={14}/> },
+    ];
+
     return (
         <div
-            className="w-full h-full bg-cover bg-center relative overflow-hidden"
+            className="w-full h-full bg-cover bg-center relative overflow-hidden flex flex-col"
             style={{ backgroundImage: `url(${settings.wallpaper})` }}
+            onContextMenu={(e) => handleContextMenu(e, 'desktop')}
         >
-            {/* Desktop Icons Grid */}
-            <div className="absolute inset-0 p-4 grid grid-flow-col auto-rows-max gap-4 z-0 content-start">
-                {apps.map((app) => (
-                    <div
-                        key={`desktop-${app.id}`}
-                        className="flex flex-col items-center justify-center w-20 p-2 rounded-xl hover:bg-white/10 cursor-pointer transition-colors group"
-                        onDoubleClick={() => handleAppClick(app.id, app.title)}
-                    >
-                        <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20 group-hover:border-white/40 shadow-lg mb-2">
-                            <app.icon className={`w-6 h-6 ${app.color}`} />
-                        </div>
-                        <span className="text-white text-xs text-center drop-shadow-md bg-black/20 px-2 py-0.5 rounded-full">
-                            {app.title}
-                        </span>
-                    </div>
-                ))}
-            </div>
+            <NotificationToast />
 
-            {/* Windows */}
-            <div className="absolute inset-0 pointer-events-none z-10">
-                <AnimatePresence>
-                    {windows.map((win) => (
-                        <WindowComponent key={win.id} windowData={win}>
-                            {renderAppContent(win.type)}
-                        </WindowComponent>
+            <div
+                className="flex-1 relative pb-20" // Padding for new dock
+                onClick={() => { focusWindow('desktop-background'); setStartMenuOpen(false); }}
+            >
+                {/* Desktop Icons Draggable */}
+                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-auto">
+                    {activeApps.map((app, index) => (
+                        <DesktopIcon
+                            key={`desktop-${app.id}`}
+                            app={app}
+                            index={index}
+                            onDoubleClick={() => handleAppClick(app.id, app.title)}
+                        />
                     ))}
-                </AnimatePresence>
-            </div>
+                </div>
 
-            {/* Dock (Liquid Glass Style) */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
-                <div className="flex items-center gap-2 p-2 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-2xl shadow-2xl">
-                    {apps.map((app) => {
-                        const isOpen = windows.some(w => w.type === app.id);
-                        const isActive = windows.some(w => w.type === app.id && w.id === activeWindowId);
-
-                        return (
-                            <div key={`dock-${app.id}`} className="relative group flex flex-col items-center">
-                                <motion.button
-                                    whileHover={{ scale: 1.15, y: -5 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => handleAppClick(app.id, app.title)}
-                                    className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${isActive ? 'bg-white/20 border-white/40 shadow-inner' : 'bg-transparent border-transparent hover:bg-white/10'}`}
-                                >
-                                    <app.icon className={`w-6 h-6 ${app.color}`} />
-                                </motion.button>
-                                {/* Active Indicator */}
-                                {isOpen && (
-                                    <div className="absolute -bottom-1 w-1.5 h-1.5 rounded-full bg-white/80" />
-                                )}
-                            </div>
-                        );
-                    })}
-
-                    <div className="w-px h-8 bg-white/20 mx-2" />
-
-                    <motion.button
-                        whileHover={{ scale: 1.15, y: -5 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setPhase('login')}
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-red-400 hover:bg-white/10 transition-colors"
-                        title="Log Out"
-                    >
-                        <Power className="w-6 h-6" />
-                    </motion.button>
+                {/* Windows */}
+                <div className="absolute inset-0 pointer-events-none z-10">
+                    <AnimatePresence>
+                        {windows.map((win) => (
+                            <WindowComponent key={win.id} windowData={win}>
+                                {renderAppContent(win.type)}
+                            </WindowComponent>
+                        ))}
+                    </AnimatePresence>
                 </div>
             </div>
+
+            <StartMenu show={startMenuOpen} onClose={() => setStartMenuOpen(false)} />
+            <Taskbar toggleStartMenu={() => setStartMenuOpen(!startMenuOpen)} />
+
+            <ContextMenu
+                show={clicked}
+                x={points.x}
+                y={points.y}
+                items={desktopContextMenuItems}
+                onClose={() => setClicked(false)}
+            />
         </div>
     )
 }

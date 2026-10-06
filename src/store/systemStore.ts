@@ -8,13 +8,23 @@ interface SystemState {
   user: {
     username: string;
     avatar?: string;
+    password?: string;
   } | null;
   settings: {
     theme: 'dark' | 'light';
     wallpaper: string;
+    language: string;
+    region: string;
+    domain: string;
+    telemetryEnabled: boolean;
+    wifiEnabled: boolean;
+    bluetoothEnabled: boolean;
+    accentColor: string;
+    volume: number;
+    brightness: number;
   };
   setPhase: (phase: SystemPhase) => void;
-  setUser: (username: string) => void;
+  setUser: (user: { username?: string; avatar?: string; password?: string }) => void;
   setSettings: (settings: Partial<SystemState['settings']>) => void;
   resetSystem: () => void;
 }
@@ -27,9 +37,18 @@ export const useSystemStore = create<SystemState>()(
       settings: {
         theme: 'dark',
         wallpaper: '/wallpapers/default.jpg',
+        language: 'en-US',
+        region: 'US',
+        domain: 'WORKGROUP',
+        telemetryEnabled: true,
+        wifiEnabled: true,
+        bluetoothEnabled: true,
+        accentColor: 'blue',
+        volume: 80,
+        brightness: 100,
       },
       setPhase: (phase) => set({ phase }),
-      setUser: (username) => set((state) => ({ user: { ...state.user, username } })),
+      setUser: (user) => set((state) => ({ user: state.user ? { ...state.user, ...user } : { username: user.username || 'User', ...user } })),
       setSettings: (newSettings) => set((state) => ({ settings: { ...state.settings, ...newSettings } })),
       resetSystem: () => set({ phase: 'setup', user: null }),
     }),

@@ -13,7 +13,7 @@ export default function SetupScreen() {
 
   const handleNext = () => {
     if (step === 1 && username.trim().length > 0) {
-      setUser(username.trim());
+      setUser({ username: username.trim() });
       setStep(2);
     } else if (step === 2) {
       setPhase('desktop'); // Skip login for first setup, go straight to desktop
