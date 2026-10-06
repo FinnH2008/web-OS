@@ -39,16 +39,20 @@ export default function WindowComponent({ windowData, children }: WindowComponen
   let currentSize = windowData.size;
   let currentPosition = windowData.position;
 
+  // We need to account for the 56px (h-14) taskbar at the bottom when maximizing
+  // so windows don't hide behind it.
+  const taskbarHeight = 56;
+
   if (windowData.isMaximized || windowData.snapPosition === 'top') {
-      currentSize = { width: '100%', height: '100%' };
+      currentSize = { width: '100%', height: `calc(100% - ${taskbarHeight}px)` };
       currentPosition = { x: 0, y: 0 };
   } else if (windowData.snapPosition === 'left') {
-      currentSize = { width: '50%', height: '100%' };
+      currentSize = { width: '50%', height: `calc(100% - ${taskbarHeight}px)` };
       currentPosition = { x: 0, y: 0 };
   } else if (windowData.snapPosition === 'right') {
-      currentSize = { width: '50%', height: '100%' };
-      // Can't reliably use window.innerWidth in render without state, but Rnd handles % well.
-      // We will let Rnd control the width and just set x dynamically based on window innerWidth.
+      currentSize = { width: '50%', height: `calc(100% - ${taskbarHeight}px)` };
+      // Rnd handles % well for size, but x needs to be calculated. In render, window.innerWidth is tricky.
+      // But setting x to '50%' works for standard CSS positioning in Rnd!
       currentPosition = { x: typeof window !== 'undefined' ? window.innerWidth / 2 : 0, y: 0 };
   }
 
@@ -61,7 +65,6 @@ export default function WindowComponent({ windowData, children }: WindowComponen
       onDragStop={(e, d) => {
         if (!windowData.isMaximized) {
             const screenWidth = window.innerWidth;
-            const screenHeight = window.innerHeight;
 
             // Advanced Snapping Detection
             if (d.y <= 0) {
@@ -92,7 +95,7 @@ export default function WindowComponent({ windowData, children }: WindowComponen
       }}
       minWidth={300}
       minHeight={200}
-      bounds="parent"
+      bounds="parent" // Ensures it doesn't go outside the Desktop bounds (which stops above taskbar if configured correctly, or we limit it here)
       dragHandleClassName="window-drag-handle"
       disableDragging={windowData.isMaximized}
       enableResizing={!isSnapped}

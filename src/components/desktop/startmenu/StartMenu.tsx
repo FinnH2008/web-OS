@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import { Search, Folder, Terminal, FileText, Calculator, Activity, Globe, Music, ShoppingBag, Settings, Power } from 'lucide-react';
 
-const APP_ICONS: Record<string, any> = {
+const APP_ICONS: Record<string, React.ElementType> = {
     'file-manager': Folder,
     'browser': Globe,
     'terminal': Terminal,
@@ -32,7 +32,7 @@ const APP_COLORS: Record<string, string> = {
 };
 
 export default function StartMenu({ show, onClose }: { show: boolean, onClose: () => void }) {
-    const { user, setPhase } = useSystemStore();
+    const { user, lockSystem } = useSystemStore();
     const { openWindow } = useWindowStore();
     const { installedApps } = useAppStore();
     const [search, setSearch] = useState('');
@@ -136,7 +136,7 @@ export default function StartMenu({ show, onClose }: { show: boolean, onClose: (
                             </div>
 
                             <button
-                                onClick={() => setPhase('login')}
+                                onClick={() => lockSystem()}
                                 className="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-red-400 transition-colors"
                                 title="Power off / Log out"
                             >

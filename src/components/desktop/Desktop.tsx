@@ -3,7 +3,7 @@
 import { useSystemStore } from '@/store/systemStore';
 import { useWindowStore, type WindowData } from '@/store/windowStore';
 import { useAppStore } from '@/store/appStore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import {
   Folder,
   Terminal,
@@ -116,7 +116,7 @@ export default function Desktop() {
             <NotificationToast />
 
             <div
-                className="flex-1 relative pb-20" // Padding for new dock
+                className="flex-1 relative" // No padding bottom so windows can maximize properly (Rnd handles calc)
                 onClick={() => { focusWindow('desktop-background'); setStartMenuOpen(false); }}
             >
                 {/* Desktop Icons Draggable */}
@@ -131,8 +131,8 @@ export default function Desktop() {
                     ))}
                 </div>
 
-                {/* Windows */}
-                <div className="absolute inset-0 pointer-events-none z-10">
+                {/* Windows Layer */}
+                <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
                     <AnimatePresence>
                         {windows.map((win) => (
                             <WindowComponent key={win.id} windowData={win}>
@@ -143,7 +143,12 @@ export default function Desktop() {
                 </div>
             </div>
 
-            <StartMenu show={startMenuOpen} onClose={() => setStartMenuOpen(false)} />
+            {/* Overlays Layer */}
+            <div className="absolute inset-0 pointer-events-none z-50">
+                <StartMenu show={startMenuOpen} onClose={() => setStartMenuOpen(false)} />
+            </div>
+
+            {/* Taskbar Layer */}
             <Taskbar toggleStartMenu={() => setStartMenuOpen(!startMenuOpen)} />
 
             <ContextMenu

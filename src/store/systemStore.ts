@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type SystemPhase = 'booting' | 'setup' | 'login' | 'desktop';
+export type SystemPhase = 'booting' | 'setup' | 'login' | 'locked' | 'desktop';
 
 interface SystemState {
   phase: SystemPhase;
@@ -27,6 +27,7 @@ interface SystemState {
   setUser: (user: { username?: string; avatar?: string; password?: string }) => void;
   setSettings: (settings: Partial<SystemState['settings']>) => void;
   resetSystem: () => void;
+  lockSystem: () => void;
 }
 
 export const useSystemStore = create<SystemState>()(
@@ -51,6 +52,7 @@ export const useSystemStore = create<SystemState>()(
       setUser: (user) => set((state) => ({ user: state.user ? { ...state.user, ...user } : { username: user.username || 'User', ...user } })),
       setSettings: (newSettings) => set((state) => ({ settings: { ...state.settings, ...newSettings } })),
       resetSystem: () => set({ phase: 'setup', user: null }),
+      lockSystem: () => set((state) => ({ phase: state.user?.password ? 'locked' : 'login' })),
     }),
     {
       name: 'system-storage',
